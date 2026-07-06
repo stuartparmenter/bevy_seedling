@@ -74,8 +74,7 @@ bevy_ecs::define_label!(
     ///         .connect(EffectsChain);
     /// }
     /// ```
-    NodeLabel,
-    NODE_LABEL_INTERNER
+    NodeLabel
 );
 
 /// The main audio bus.
