@@ -75,7 +75,7 @@ firewheel = { version = "0.12.0", default-features = false, features = [
   "spatial_basic_node",
   "scheduled_events",
   "musical_transport",
-  "glam-32",
+  "glam-33",
   "sampler_node",
   "std",
   "tracing",
