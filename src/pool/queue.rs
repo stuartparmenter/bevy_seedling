@@ -69,6 +69,7 @@ pub(super) fn grow_pools(
 
         let inactive_samplers = nodes
             .iter_many(samplers.iter())
+            .matched()
             .filter(|n| n.is_none())
             .count();
 
@@ -325,7 +326,9 @@ pub(super) fn assign_work(
 
         // otherwise, sort the available samplers
         let mut sampler_scores = Vec::new();
-        for (sampler_entity, params, state, assignment) in nodes.iter_many(samplers.iter()) {
+        for (sampler_entity, params, state, assignment) in
+            nodes.iter_many(samplers.iter()).matched()
+        {
             let raw_score = state.0.worker_score(params);
             let has_assignment = assignment.is_some();
 
