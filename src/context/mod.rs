@@ -157,9 +157,17 @@ where
             "Attempted to initialize audio context with unexpected backend type. \
                     `bevy_seedling` expects a single context.",
         );
-        context
-            .start_stream(config.0.clone())
-            .map_err(|e| format!("failed to start audio stream: {e:?}"))?;
+        if let Err(e) = context.start_stream(config.0.clone()) {
+            // No output device (headless box, disconnected remote session) or
+            // any backend failure must not take the app down: run silent. The
+            // sample loader still registers, at the standard rate, so sample
+            // assets keep decoding; `StreamStartEvent` never fires.
+            bevy_log::warn!("failed to start audio stream, continuing without audio: {e:?}");
+            let sample_rate = SampleRate(sync::Arc::new(sync::atomic::AtomicU32::new(44_100)));
+            commands.insert_resource(sample_rate.clone());
+            server.register_loader(crate::sample::SampleLoader { sample_rate });
+            return Ok(());
+        }
 
         let raw_sample_rate = context.stream_info().unwrap().sample_rate;
         let sample_rate = SampleRate(sync::Arc::new(sync::atomic::AtomicU32::new(
