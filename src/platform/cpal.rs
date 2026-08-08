@@ -91,7 +91,6 @@ fn start_stream(
     stream_config: Res<AudioStreamConfig<CpalConfig>>,
     commands: Commands,
 ) -> Result {
-    // TODO: it's not possible for the user to recover if this fails
     let sample_rate = context.with_store(|context, store| {
         let stream = cpal::CpalStream::new(context, stream_config.0.clone())?;
         let sample_rate = stream.info().sample_rate;
@@ -100,7 +99,17 @@ fn start_stream(
         debug_assert!(previous.is_none());
 
         Ok::<_, StartStreamError>(sample_rate)
-    })?;
+    });
+
+    // No output device (headless box, disconnected remote session) or any
+    // backend failure must not take the app down: run silent. Initializing
+    // at the standard rate still registers the sample loader, so sample
+    // assets keep decoding, and a later `RestartAudioStream` can bring a
+    // real stream up.
+    let sample_rate = sample_rate.unwrap_or_else(|e| {
+        warn!("failed to start audio stream, continuing without audio: {e:?}");
+        core::num::NonZeroU32::new(44_100).unwrap()
+    });
 
     super::initialize_stream(SampleRate::new(sample_rate), commands);
 
