@@ -51,8 +51,8 @@ profiling = ["dep:audioadapter-buffers"]
 [dependencies]
 bevy_ecs = { version = "0.20.0-dev", default-features = false }
 bevy_app = { version = "0.20.0-dev", default-features = false }
+bevy_curve = { version = "0.20.0-dev", default-features = false, features = ["std"] }
 bevy_math = { version = "0.20.0-dev", default-features = false, features = [
-  "curve",
   "std",
 ] }
 bevy_asset = { version = "0.20.0-dev", default-features = false }

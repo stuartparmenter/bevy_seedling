@@ -142,7 +142,7 @@ pub struct NodeLabels(SmallVec<[InternedNodeLabel; 1]>);
 
 impl NodeLabels {
     pub(crate) fn on_add_observer(
-        trigger: On<Insert, NodeLabels>,
+        trigger: On<Insert<NodeLabels>>,
         labels: Query<&NodeLabels>,
         mut map: ResMut<NodeMap>,
     ) -> Result {
@@ -160,7 +160,7 @@ impl NodeLabels {
     }
 
     pub(crate) fn on_discard_observer(
-        trigger: On<Discard, NodeLabels>,
+        trigger: On<Discard<NodeLabels>>,
         labels: Query<&NodeLabels>,
         mut map: ResMut<NodeMap>,
     ) -> Result {
