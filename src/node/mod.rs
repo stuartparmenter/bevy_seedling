@@ -289,7 +289,7 @@ fn acquire_id<T>(
 }
 
 fn insert_baseline<T: Component + Clone>(
-    trigger: On<Insert, T>,
+    trigger: On<Insert<T>>,
     q: Query<&T>,
     mut commands: Commands,
 ) -> Result {
@@ -631,7 +631,7 @@ impl RegisterNode for App {
 }
 
 fn observe_node_insertion<T: Component + Clone>(
-    trigger: On<Insert, T>,
+    trigger: On<Insert<T>>,
     node: Query<&T>,
     components: &Components,
     time: Res<Time<Audio>>,
@@ -657,7 +657,7 @@ fn observe_node_insertion<T: Component + Clone>(
 }
 
 fn observe_simple_node_insertion<T: Component>(
-    trigger: On<Insert, T>,
+    trigger: On<Insert<T>>,
     components: &Components,
     time: Res<Time<Audio>>,
     mut commands: Commands,

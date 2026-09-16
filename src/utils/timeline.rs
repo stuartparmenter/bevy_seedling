@@ -1,10 +1,7 @@
 //! Audio-rate parameter curves.
 
 use crate::utils::fixed_vec::FixedVec;
-use bevy_math::{
-    Curve,
-    curve::{Ease, EaseFunction, EasingCurve},
-};
+use bevy_curve::{Curve, Ease, EaseFunction, EasingCurve};
 use firewheel::{
     clock::InstantSeconds,
     diff::{Diff, EventQueue, Patch, PatchError, PathBuilder},
