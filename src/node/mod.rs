@@ -73,7 +73,7 @@ pub struct AudioBypass;
 
 impl AudioBypass {
     fn remove_bypass(
-        trigger: On<Remove, AudioBypass>,
+        trigger: On<Remove<AudioBypass>>,
         mut node: Query<&mut AudioEvents>,
     ) -> Result {
         let mut events = node.get_mut(trigger.entity)?;
