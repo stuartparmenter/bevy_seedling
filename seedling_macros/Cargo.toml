@@ -14,7 +14,7 @@ documentation = "https://docs.rs/bevy_seedling"
 proc-macro = true
 
 [dependencies]
-syn = { version = "2.0", features = ["full"] }
+syn = { version = "3.0", features = ["full"] }
 quote = "1.0"
 proc-macro2 = "1.0"
 bevy_macro_utils = "0.20.0-dev"
