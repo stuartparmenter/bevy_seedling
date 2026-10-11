@@ -15,9 +15,40 @@ use crate::{
 
 pub use firewheel::cpal::*;
 
+use cpal::cpal::ErrorKind;
+
 /// `bevy_seedling`'s `cpal` platform plugin.
 ///
 /// This plugin spawns and manages a `cpal` audio stream.
+///
+/// To adjust `cpal`'s settings, such as input or output
+/// device selection, you can mutate or insert
+/// [`AudioStreamConfig<CpalConfig>`]. The initial configuration
+/// is applied at [`SeedlingStartupSystems::StreamInitialization`] in
+/// [`PostStartup`], and subsequent changes will automatically cause the
+/// stream to restart with the new settings.
+///
+/// ```
+/// # use bevy::prelude::*;
+/// # use bevy_seedling::prelude::*;
+/// # use bevy_seedling::platform::cpal::{CpalConfig, CpalInputConfig};
+/// # use bevy_seedling::context::AudioContextConfig;
+/// # fn run() {
+/// App::new()
+///     .add_plugins((DefaultPlugins, SeedlingPlugins))
+///     .insert_resource(AudioStreamConfig(CpalConfig {
+///         // acquire the default system input
+///         input: Some(CpalInputConfig::default()),
+///         ..Default::default()
+///     }))
+///     .insert_resource(AudioContextConfig(FirewheelConfig {
+///         // Ensure the graph has an input
+///         num_graph_inputs: ChannelCount::MONO,
+///         ..Default::default()
+///     }))
+///     .run();
+/// # }
+/// ```
 #[derive(Debug, Default)]
 pub struct CpalPlatformPlugin;
 
@@ -85,28 +116,45 @@ fn poll_stream(mut context: ResMut<AudioContext>, mut commands: Commands) -> Res
 
     for error in errors.into_iter().flatten() {
         match error {
-            IoStreamError::Input(error) => match error {
-                StreamError::StreamInvalidated | StreamError::DeviceNotAvailable => {
+            IoStreamError::Input(error) => match error.kind() {
+                // nothing to do here
+                ErrorKind::DeviceChanged => {}
+                ErrorKind::Xrun => {
+                    warn!("audio input stream encountered underrun or overrun");
+                }
+                ErrorKind::StreamInvalidated | ErrorKind::DeviceNotAvailable => {
                     warn!("audio input stream stopped: {error:?}");
                 }
-                StreamError::BufferUnderrun => {
-                    warn!("audio input stream encountered underrun");
-                }
-                StreamError::BackendSpecific { err } => {
-                    error!("unexpected audio input error: {err}");
-                }
+                kind => match error.message() {
+                    Some(message) => {
+                        error!("audio input error: {message}");
+                    }
+                    None => {
+                        error!("audio input error: {kind}");
+                    }
+                },
             },
-            IoStreamError::Output(error) => match error {
-                StreamError::StreamInvalidated | StreamError::DeviceNotAvailable => {
+            IoStreamError::Output(error) => match error.kind() {
+                // nothing to do here
+                ErrorKind::DeviceChanged => {}
+                ErrorKind::Xrun => {
+                    warn!("audio output stream encountered underrun or overrun");
+                }
+                ErrorKind::StreamInvalidated
+                | ErrorKind::DeviceNotAvailable
+                | ErrorKind::DeviceBusy
+                | ErrorKind::HostUnavailable => {
                     warn!("audio stream stopped: {error:?}");
                     commands.trigger(RestartAudioStream);
                 }
-                StreamError::BufferUnderrun => {
-                    warn!("audio stream encountered underrun");
-                }
-                StreamError::BackendSpecific { err } => {
-                    error!("unexpected audio backend error: {err}");
-                }
+                kind => match error.message() {
+                    Some(message) => {
+                        error!("audio output error: {message}");
+                    }
+                    None => {
+                        error!("audio output error: {kind}");
+                    }
+                },
             },
         }
     }

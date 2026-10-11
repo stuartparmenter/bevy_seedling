@@ -16,11 +16,34 @@ pub mod web_audio;
 #[cfg(any(feature = "profiling", test))]
 pub mod mock;
 
+/// The web platform isn't able to start
+/// the context synchronously without direct user input.
+/// That means the diffing code will fill the the processor's
+/// buffers without ever getting cleared until the context
+/// actually starts.
+///
+/// This signal helps mitigate that.
+///
+/// We still let some events through such as sample playback events,
+/// but these shouldn't overwhelm the buffers as the pools
+/// will simply saturate and eventually reject new queue requests.
+///
+/// This downside could also be mitigated, but requires more
+/// careful attention.
+#[derive(Resource, Debug)]
+pub(crate) struct ProcessorActive(pub bool);
+
+impl Default for ProcessorActive {
+    fn default() -> Self {
+        Self(true)
+    }
+}
+
 /// A [`Resource`] containing the audio context's stream configuration.
 ///
 /// Mutating this resource will cause the audio stream to stop
 /// and restart, applying the latest changes.
-#[derive(Resource, Component, Debug, Default)]
+#[derive(Resource, Debug, Default)]
 #[cfg_attr(feature = "reflect", derive(bevy_reflect::Reflect))]
 pub struct AudioStreamConfig<C>(pub C);
 

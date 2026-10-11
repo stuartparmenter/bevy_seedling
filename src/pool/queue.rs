@@ -4,6 +4,7 @@ use super::{
 };
 use crate::{
     node::{AudioState, EffectId, IgnoreDiffTimer, follower::FollowerOf},
+    platform::ProcessorActive,
     pool::label::PoolLabelContainer,
     prelude::{AudioEvents, DefaultPool},
     sample::{AudioSample, QueuedSample, SamplePlayer, SamplePriority, SampleQueueLifetime},
@@ -15,7 +16,7 @@ use bevy_platform::collections::HashMap;
 use bevy_time::{Stopwatch, Time};
 use firewheel::{
     diff::EventQueue,
-    nodes::sampler::{RepeatMode, SamplerConfig, SamplerNode, SamplerState},
+    nodes::sampler::{PlaybackState, RepeatMode, SamplerConfig, SamplerNode, SamplerState},
 };
 use std::ops::Deref;
 
@@ -262,6 +263,7 @@ pub(super) fn assign_work(
     active_samples: Query<(&SamplePlayer, &SamplePriority)>,
     mut effects: Query<&EffectId, With<EffectOf>>,
     assets: Res<Assets<AudioSample>>,
+    active: Res<ProcessorActive>,
     mut commands: Commands,
 ) -> Result {
     let mut queued_samples: HashMap<_, Vec<_>> = queued_samples
@@ -323,13 +325,12 @@ pub(super) fn assign_work(
             let mut inactive = inactive_samplers.iter();
 
             for (sample_entity, player, asset, sample_effects, _priority) in queued_samples {
-                let (sampler_entity, mut params, mut events, state, _) =
+                let (sampler_entity, mut params, mut events, ..) =
                     nodes.get_mut(*inactive.next().unwrap())?;
 
                 events.push(SamplerNode::set_dyn_sample_event(asset.get()));
                 params.volume = player.volume;
                 params.repeat_mode = player.repeat_mode;
-                state.0.clear_finished();
 
                 if normalize_effects(
                     sample_entity,
@@ -355,7 +356,7 @@ pub(super) fn assign_work(
         // otherwise, sort the available samplers
         let mut sampler_scores = Vec::new();
         for (sampler_entity, params, _ev, state, assignment) in nodes.iter_many(samplers.iter()) {
-            let raw_score = state.0.worker_score(params);
+            let raw_score = calculate_raw_score(&state.0, params);
             let has_assignment = assignment.is_some();
 
             let active_data = assignment.and_then(|a| {
@@ -409,13 +410,23 @@ pub(super) fn assign_work(
                 continue;
             }
 
-            let (sampler_entity, mut params, mut events, state, _) =
-                nodes.get_mut(sampler_entity)?;
+            // Finally, we'll never allow a non-looping sound to
+            // steal another non-looping sound of equal priority
+            // when the processor is inactive to avoid runaway sound queuing.
+            if !active.0
+                && sampler_score.has_assignment
+                && &sampler_score.priority == priority
+                && !sampler_score.is_looping
+                && player.repeat_mode == RepeatMode::PlayOnce
+            {
+                continue;
+            }
+
+            let (sampler_entity, mut params, mut events, ..) = nodes.get_mut(sampler_entity)?;
 
             events.push(SamplerNode::set_dyn_sample_event(asset.get()));
             params.volume = player.volume;
             params.repeat_mode = player.repeat_mode;
-            state.0.clear_finished();
 
             if normalize_effects(
                 sample_entity,
@@ -554,6 +565,36 @@ pub(super) fn assign_default(
                     }
                 }
             }
+        }
+    }
+}
+
+fn calculate_raw_score(state: &SamplerState, current_worker_params: &SamplerNode) -> u64 {
+    let state = state.current_processor_state();
+
+    if current_worker_params.playback_id() <= state.last_finished_playback_id {
+        // Sequence has finished playing.
+        return u64::MAX;
+    }
+
+    if *current_worker_params.play {
+        if current_worker_params.playback_id() == state.playback_id
+            && state.playback_state == PlaybackState::Stopped
+        {
+            // Sequence has not started playing yet
+            u64::MAX - 4
+        } else {
+            // The older the sample is, the better it is as a candidate to steal
+            // work from.
+            state.playback_age_frames
+        }
+    } else if !state.has_sample_resource {
+        u64::MAX
+    } else {
+        match state.playback_state {
+            PlaybackState::Stopped => u64::MAX - 1,
+            PlaybackState::Paused => u64::MAX - 2,
+            PlaybackState::Playing => u64::MAX - 3,
         }
     }
 }
